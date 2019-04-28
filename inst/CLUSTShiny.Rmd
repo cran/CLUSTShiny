@@ -1,0 +1,347 @@
+---
+title: "Cluster Analysis"
+output: html_document
+runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(datasets)
+library(psycho)
+
+```
+##  Hierarchical and  K-means Clustering
+The distance measure used is  Euclidean in case of both Hierarchical and K-means(Non-hierarchical) Clustering.
+The method(algorithm)  used  is Ward's method for hierarchical clustering
+and k-means algorithm for non-hierarchical clustering.
+Hierarchical Clustering is for exploration .So is Silhouette plot for detecting outliers.
+K-means Clustering is meant for confirmation. K-means is done usually after hierarchical clustering.
+There would be a difference between the cluster sizes from the two algorithms.
+Final Clusters and membership is usually taken from k-means clustering.
+
+
+```{r,echo=FALSE}
+sidebarPanel(
+  checkboxInput("ex","Uncheck for using your own file",value = TRUE),
+  fileInput("file", "Upload the *.csv file with headers"),
+  numericInput("ncluster","Enter the number of clusters",value = 2),
+  
+  checkboxInput("std","STANDARDIZE",value = FALSE),
+  downloadButton("downloaddata", "Download Dataset"),
+  downloadButton("downloadPlot", "Download Plot"),
+  downloadButton("downloadPlot2", "Download Dendrogram"),
+  downloadButton("downloadPlot3", "Download Silhouette"),
+  uiOutput("vx")
+  
+ 
+)
+mainPanel(
+   tabsetPanel(type = "tab",
+                tabPanel("Hierarchical Clustering Visualization",plotOutput("HV")),
+                tabPanel("Detecting outliers : Silhouette Plot(hierarchical)",plotOutput("SP")),
+                tabPanel("K- means Clustering", verbatimTextOutput("AD") ),
+                tabPanel("Cluster Visualization(k-means)", plotOutput("MV") )
+               
+                ),
+     
+   h6("", tags$img(src ="K.JPG", height= 400, width=400))
+)
+output$AD<-renderPrint({
+   if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else{
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     ds = select(data,input$variablex)
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     set.seed(1)
+     fitkmeans =  kmeans(ds,centers = input$ncluster )
+     
+     cat(sprintf("\nThe Cluster centres are as follows:\n"))
+     print(fitkmeans$centers)
+     cat(sprintf("\nThe Cluster sizes are as follows:\n"))
+     cat(sprintf("%d",fitkmeans$size))
+})
+
+output$MV<-renderPlot({ 
+  if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else{
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     ds = data
+     
+     ds = select(ds,input$variablex)
+     
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     set.seed(1)
+     fitkmeans =  kmeans(ds,centers = input$ncluster )
+     ds$cluster = as.factor(fitkmeans$cluster)
+     
+    
+      
+
+    if(ncol(ds)>2 && input$ncluster >1)
+    {  klaR:: partimat(formula = cluster~.,data = ds,method="lda")}
+   else
+   { 
+     if(input$ncluster>=1 && ncol(ds)==2)
+   {  attach(ds)
+     boxplot(get(input$variablex)~cluster,col ="red",ylab = input$variablex,xlab = "cluster")
+     }
+   } 
+     
+#     } 
+
+     
+     
+})
+
+
+output$vx <- renderUI({
+   
+
+    if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else
+     {
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+    
+     ds = select_if(data,is.numeric)
+    
+checkboxGroupInput("variablex","Select the set of quantitative variables",choices = colnames(ds),selected = colnames(ds) )
+    
+
+
+  })
+
+datasetInput1 <- reactive({
+  
+    if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else
+     {
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     
+     ds = data
+     ds = select(ds,input$variablex)
+     
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     set.seed(1)
+     fitkmeans =  kmeans(ds,centers = input$ncluster )
+     data$cluster = as.factor(fitkmeans$cluster)
+     
+     data = data
+     
+})
+output$downloaddata <- downloadHandler(
+    filename = function() {
+      filetitle = paste("dataset")
+      paste(filetitle, ".csv", sep = "")
+    },
+    content = function(file) {
+      
+      write.csv(datasetInput1(), file, row.names = FALSE)
+    }
+  )
+output$downloadPlot<- downloadHandler(
+    filename = function() {
+      paste("Discriminantplot", ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)
+      if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else{
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     ds = data
+     
+     ds = select(ds,input$variablex)
+     
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     set.seed(1)
+     fitkmeans =  kmeans(ds,centers = input$ncluster )
+     ds$cluster = as.factor(fitkmeans$cluster)
+     
+    
+      
+
+    if(ncol(ds)>2 && input$ncluster >1)
+    {  klaR:: partimat(formula = cluster~.,data = ds,method="lda")}
+   else
+   { 
+     if(input$ncluster>=1 && ncol(ds)==2)
+   {  attach(ds)
+     boxplot(get(input$variablex)~cluster,col ="red",ylab = input$variablex,xlab = "cluster")
+     }
+   } 
+     
+#     } 
+
+     
+    
+     
+      dev.off()
+    })
+
+output$HV<-renderPlot({
+   if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else{
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     ds = select(data,input$variablex)
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     
+d = dist(ds,method = "euclidean") # Measure of similarity
+fit = hclust(d,method = "ward.D") # Method of using similarity measure
+plot(fit)
+rect.hclust(fit,k=input$ncluster,border = "red")
+#groups = cutree(fit,k=input$ncluster)
+#plot(cluster::silhouette(groups,d))
+
+})
+
+output$downloadPlot2<- downloadHandler(
+    filename = function() {
+      paste("Dendogram", ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)
+
+if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else{
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     ds = select(data,input$variablex)
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     
+d = dist(ds,method = "euclidean") # Measure of similarity
+fit = hclust(d,method = "ward.D") # Method of using similarity measure
+plot(fit)
+rect.hclust(fit,k=input$ncluster,border = "red")
+     
+    
+     
+      dev.off()
+    })
+
+output$SP<-renderPlot({
+   if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else{
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     ds = select(data,input$variablex)
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     
+d = dist(ds,method = "euclidean") # Measure of similarity
+fit = hclust(d,method = "ward.D") # Method of using similarity measure
+#plot(fit)
+#rect.hclust(fit,k=input$ncluster,border = "red")
+groups = cutree(fit,k=input$ncluster)
+plot(cluster::silhouette(groups,d))
+
+})
+
+output$downloadPlot3<- downloadHandler(
+    filename = function() {
+      paste("Silhouette", ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)
+
+if(input$ex == TRUE)
+     {data("iris")
+      data = iris}
+     else{
+  file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+     }
+     ds = select(data,input$variablex)
+     if(input$std == TRUE)
+     {
+       ds = standardize(ds)
+     }
+     
+d = dist(ds,method = "euclidean") # Measure of similarity
+fit = hclust(d,method = "ward.D") # Method of using similarity measure
+#plot(fit)
+#rect.hclust(fit,k=input$ncluster,border = "red")
+ groups = cutree(fit,k=input$ncluster)
+plot(cluster::silhouette(groups,d))    
+    
+     
+      dev.off()
+    })
+```
